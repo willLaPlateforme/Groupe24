@@ -1,6 +1,8 @@
 ---
 title: "Couverture des taxonomies Open Food Facts"
 format: html
+execute:
+  echo: false
 jupyter: python3
 ---
 
