@@ -1,0 +1,20 @@
+---
+title: "Couverture des taxonomies Open Food Facts"
+format: html
+jupyter: python3
+---
+
+## Introduction
+
+```{python}
+import json
+import pandas as pd
+
+with open("data/wikidata_labels.json", "r", encoding="utf-8") as f:
+    data = json.load(f)
+
+# Convertir en DataFrame
+df = pd.DataFrame.from_dict(data, orient="index")
+df.index.name = "wikidata_id"
+df.head(10)
+```
