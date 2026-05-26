@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>OpenFoodFacts – Taxonomy Explorer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Import de TON style.css -->
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Plotly -->
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+
+  <!-- DataTables -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css"/>
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+</head>
+
+<body>
+<div class="shell view">
+
+  <header>
+    <div class="eyebrow">OpenFoodFacts · Taxonomy Explorer</div>
+    <h1>Couverture <em>taxonomies</em> & traductions</h1>
+    <div class="meta-row">
+      <div class="meta-chip">
+        <span class="dot"></span>
+        Dashboard · Python + Quarto
+      </div>
+      <div class="meta-chip">
+        Données : catégories.json, translations.json, wikidata_labels.json, parquet OFF
+      </div>
+    </div>
+  </header>
+
+  <!-- Stats globales -->
+  <section>
+    <div class="stats-row">
+      <div class="sc">
+        <div class="n g" id="kpi-categories">–</div>
+        <div class="l">TAGS CATÉGORIES</div>
+      </div>
+      <div class="sc">
+        <div class="n b" id="kpi-languages">–</div>
+        <div class="l">LANGUES DÉTECTÉES</div>
+      </div>
+      <div class="sc">
+        <div class="n a" id="kpi-translations">–</div>
+        <div class="l">TRADUCTIONS TOTALES</div>
+      </div>
+      <div class="sc">
+        <div class="n t" id="kpi-wikidata">–</div>
+        <div class="l">ENTRÉES WIKIDATA</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Graphiques -->
+  <section class="grid2">
+    <div class="panel">
+      <div class="ph">
+        <div class="pt">📊 Noms par langue – Top 15</div>
+      </div>
+      <div class="pbody">
+        <div id="bar-top-lang" class="cw tall"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="ph">
+        <div class="pt">🍩 Répartition Top 8</div>
+      </div>
+      <div class="pbody">
+        <div id="donut-top8" class="cw tall"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tableau -->
+  <section class="panel">
+    <div class="ph">
+      <div class="pt">📋 Tableau dynamique – Noms de catégories (échantillon)</div>
+    </div>
+    <div class="pbody">
+      <table id="lang-table" class="dtbl">
+        <thead>
+          <tr>
+            <th>Langue</th>
+            <th>Label</th>
+          </tr>
+        </thead>
+        <tbody id="lang-table-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+</div>
+
+<!-- Données JS (remplacées par Quarto si besoin) -->
+<script>
+  const KPIS = {
+    categories: 20032,
+    languages: 238,
+    translations: 143539,
+    wikidata: 4083
+  };
+
+  const TOP15 = [
+    {"lang":"fr","count":12000},
+    {"lang":"en","count":11000},
+    {"lang":"nl","count":10262},
+    {"lang":"de","count":8000},
+    {"lang":"es","count":7000},
+    {"lang":"pt","count":6000},
+    {"lang":"ja","count":5000},
+    {"lang":"pl","count":4000},
+    {"lang":"sv","count":3500},
+    {"lang":"da","count":3000},
+    {"lang":"ru","count":2800},
+    {"lang":"tr","count":2600},
+    {"lang":"cs","count":2400},
+    {"lang":"no","count":2200},
+    {"lang":"it","count":2000}
+  ];
+
+  const TOP8 = TOP15.slice(0, 8);
+
+  const TABLE_DATA = [
+    {"lang":"fr","label":"Boissons"},
+    {"lang":"en","label":"Beverages"},
+    {"lang":"nl","label":"Dranken"},
+    {"lang":"de","label":"Getränke"},
+    {"lang":"es","label":"Bebidas"},
+    {"lang":"pt","label":"Bebidas"},
+    {"lang":"ja","label":"飲料"},
+    {"lang":"it","label":"Bevande"}
+  ];
+</script>
+
+<!-- Logique du dashboard -->
+<script>
+  document.getElementById("kpi-categories").textContent = KPIS.categories.toLocaleString("fr-FR");
+  document.getElementById("kpi-languages").textContent = KPIS.languages.toLocaleString("fr-FR");
+  document.getElementById("kpi-translations").textContent = KPIS.translations.toLocaleString("fr-FR");
+  document.getElementById("kpi-wikidata").textContent = KPIS.wikidata.toLocaleString("fr-FR");
+
+  Plotly.newPlot("bar-top-lang", [{
+    x: TOP15.map(d => d.lang),
+    y: TOP15.map(d => d.count),
+    type: "bar",
+    marker: { color: TOP15.map(d => d.count), colorscale: "Blues" }
+  }], {
+    title: "Noms par langue – Top 15",
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { color: '#e8eaed' }
+  });
+
+  Plotly.newPlot("donut-top8", [{
+    labels: TOP8.map(d => d.lang),
+    values: TOP8.map(d => d.count),
+    type: "pie",
+    hole: 0.55,
+    textinfo: "label+percent"
+  }], {
+    title: "Répartition Top 8",
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { color: '#e8eaed' }
+  });
+
+  const tbody = document.getElementById("lang-table-body");
+  TABLE_DATA.forEach(row => {
+    tbody.innerHTML += `<tr><td>${row.lang}</td><td>${row.label}</td></tr>`;
+  });
+
+  $(document).ready(() => {
+    $("#lang-table").DataTable({
+      pageLength: 10,
+      lengthChange: false,
+      language: {
+        url: "https://cdn.datatables.net/plug-ins/1.13.8/i18n/fr-FR.json"
+      }
+    });
+  });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,71 @@
+---
+title: "OpenFoodFacts – Taxonomy Explorer"
+format:
+  html:
+    theme: cosmo
+    toc: false
+    page-layout: full
+jupyter: python3
+---
+
+```{python}
+import pandas as pd
+import json
+from pathlib import Path
+
+# Chargement des fichiers
+df = pd.read_parquet("rawOpenfoodfacts_data.parquet")
+
+with open("categories.json", encoding="utf-8") as f:
+    categories = json.load(f)
+
+with open("translations.json", encoding="utf-8") as f:
+    translations = json.load(f)
+
+with open("wikidata_labels.json", encoding="utf-8") as f:
+    wikidata_labels = json.load(f)
+
+# ============================
+# KPIs
+# ============================
+kpi_categories = len(categories)
+kpi_languages = len({lang for c in categories.values() if "name" in c for lang in c["name"]})
+kpi_translations = sum(len(v) for v in translations.values())
+kpi_wikidata = len(wikidata_labels)
+
+# ============================
+# Top langues
+# ============================
+rows = []
+for key, data in categories.items():
+    if "name" in data:
+        for lang, label in data["name"].items():
+            rows.append({"lang": lang, "label": label})
+
+df_lang = pd.DataFrame(rows)
+
+top_lang = (
+    df_lang.groupby("lang")
+    .size()
+    .sort_values(ascending=False)
+    .head(15)
+    .reset_index(name="count")
+)
+
+top8 = top_lang.head(8)
+
+# ============================
+# Export JS
+# ============================
+import json
+
+js_kpis = json.dumps({
+    "categories": kpi_categories,
+    "languages": kpi_languages,
+    "translations": kpi_translations,
+    "wikidata": kpi_wikidata
+})
+
+js_top15 = top_lang.to_json(orient="records", force_ascii=False)
+js_top8 = top8.to_json(orient="records", force_ascii=False)
+js_table = df_lang.head(200).to_json(orient="records", force_ascii=False)
