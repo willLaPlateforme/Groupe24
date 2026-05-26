@@ -1,0 +1,35 @@
+---
+title: "Couverture des taxonomies Open Food Facts"
+format: html
+jupyter: python3
+---
+
+## Chargement des données
+
+```{python}
+import json
+import pandas as pd
+import plotly.express as px
+
+# 1. Charger le JSON
+with open("data/wikidata_labels.json", "r", encoding="utf-8") as f:
+    data = json.load(f)
+
+# 2. Créer le DataFrame
+df = pd.DataFrame.from_dict(data, orient="index")
+df.index.name = "wikidata_id"
+
+print("Données chargées :", df.shape)
+```
+
+## Couverture par langue
+
+```{python}
+# 3. Calculer et afficher le graphique
+df_couverture = (df.notna().mean() * 100).reset_index()
+df_couverture.columns = ["langue", "couverture"]
+
+fig = px.bar(df_couverture, x="langue", y="couverture",
+             title="Couverture par langue (%)")
+fig.show()
+```
