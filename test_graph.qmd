@@ -1,6 +1,8 @@
 ---
 title: "Couverture des taxonomies Open Food Facts"
-format: html
+format:
+  html:
+    css: style.css
 execute:
   echo: false
 jupyter: python3
@@ -35,3 +37,5 @@ fig = px.bar(df_couverture, x="langue", y="couverture",
              title="Couverture par langue (%)")
 fig.show()
 ```
+
+<button onclick="alert('Bonjour !')">Cliquer ici</button>

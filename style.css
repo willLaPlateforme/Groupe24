@@ -1,0 +1,12 @@
+h1 {
+    background-color: #008C8C;
+    color: white;
+}
+
+h2 {
+    color: #008C8C;
+}
+
+.bars path {
+  fill: #FF8C14 !important;
+}
