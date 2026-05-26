@@ -1,0 +1,109 @@
+---
+title: "Couverture des taxonomies Open Food Facts"
+format: html
+execute:
+  echo: false
+jupyter: python3
+---
+
+## Chargement des données
+
+```{python}
+import json
+import pandas as pd
+import plotly.express as px
+
+# 1. Charger le JSON
+with open("categories.full.json", "r", encoding="utf-8") as f:
+    data = json.load(f)
+
+# 2. Créer le DataFrame
+df = pd.DataFrame.from_dict(data, orient="index")
+df.index.name = "wikidata_id"
+
+print("Données chargées :", df.shape)
+```
+
+
+
+
+<div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 20px; gap: 10px;">
+  <button class="btn btn-primary" id="langue-button">Langue</button>
+  <button class="btn btn-primary" id="categorie-button">Catégorie</button>
+  <button class="btn btn-primary" id="produit-button">Produit</button>
+</div>
+
+
+<div id="graph-langue">
+```{python}
+# Couverture brute par langue à partir de categories.full.json
+from collections import Counter
+
+lang_counter = Counter()
+for val in data.values():
+  if 'name' in val:
+    for lang in val['name']:
+      lang_counter[lang] += 1
+total = len(data)
+df_lang = pd.DataFrame({
+  'langue': list(lang_counter.keys()),
+  'couverture': [100 * v / total for v in lang_counter.values()]
+})
+df_lang = df_lang.sort_values('couverture', ascending=False)
+
+fig = px.bar(df_lang, x="langue", y="couverture", title="% de couverture par langue (fr, en, ...)", labels={"langue": "Langue", "couverture": "% de couverture"})
+fig.show()
+```
+</div>
+
+<div id="graph-categorie" style="display:none;">
+```{python}
+# Pourcentage de catégories traduites par pays
+from collections import Counter
+
+# Extraction pays et langues
+rows = []
+for key, val in data.items():
+  # Pays d'origine
+  pays = val.get('origins', {}).get('en', None)
+  # Langues disponibles pour le nom
+  langues = list(val.get('name', {}).keys()) if 'name' in val else []
+  rows.append({'categorie': key, 'pays': pays, 'langues': langues})
+
+df_cat = pd.DataFrame(rows)
+df_cat = df_cat.dropna(subset=['pays'])
+
+# Pour chaque pays, % de catégories ayant au moins une traduction
+df_cat['traduite'] = df_cat['langues'].apply(lambda l: len(l) > 0)
+pourc = df_cat.groupby('pays')['traduite'].mean().reset_index()
+pourc['traduite'] = pourc['traduite'] * 100
+
+fig = px.bar(pourc, x='pays', y='traduite', title="% de catégories traduites par pays", labels={'traduite':'% traduit'})
+fig.show()
+```
+</div>
+
+<div id="graph-produit" style="display:none;">
+```{python}
+# Placeholder produit basé sur categories.full.json
+# À adapter selon la structure réelle de df
+fig = px.bar(title="Produit par pays (à adapter, source: categories.full.json)")
+fig.show()
+```
+</div>
+
+<script>
+// Affichage dynamique des graphiques
+document.addEventListener('DOMContentLoaded', function() {
+  function showGraph(id) {
+    document.getElementById('graph-langue').style.display = (id === 'langue') ? '' : 'none';
+    document.getElementById('graph-categorie').style.display = (id === 'categorie') ? '' : 'none';
+    document.getElementById('graph-produit').style.display = (id === 'produit') ? '' : 'none';
+  }
+  document.getElementById('langue-button').onclick = function() { showGraph('langue'); };
+  document.getElementById('categorie-button').onclick = function() { showGraph('categorie'); };
+  document.getElementById('produit-button').onclick = function() { showGraph('produit'); };
+});
+</script>
+
+
