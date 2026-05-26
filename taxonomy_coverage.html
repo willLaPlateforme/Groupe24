@@ -21,6 +21,7 @@
 <body>
 <div class="shell view">
 
+  <!-- HEADER -->
   <header>
     <div class="eyebrow">OpenFoodFacts · Taxonomy Explorer</div>
     <h1>Couverture <em>taxonomies</em> & traductions</h1>
@@ -34,6 +35,20 @@
       </div>
     </div>
   </header>
+
+  <!-- ──────────────── FILTRE ──────────────── -->
+  <div class="toolbar">
+    <div class="tlabel">FILTRE</div>
+
+    <button class="fbtn on" id="filter-all">Tout</button>
+    <button class="fbtn" id="filter-categories">Catégories</button>
+    <button class="fbtn" id="filter-languages">Langues les plus traduites</button>
+
+    <div class="tr sw">
+      <span class="si">🔍</span>
+      <input type="text" id="search-box" class="sbox" placeholder="filtrer…">
+    </div>
+  </div>
 
   <!-- Stats globales -->
   <section>
@@ -141,11 +156,13 @@
 
 <!-- Logique du dashboard -->
 <script>
+  // KPIs
   document.getElementById("kpi-categories").textContent = KPIS.categories.toLocaleString("fr-FR");
   document.getElementById("kpi-languages").textContent = KPIS.languages.toLocaleString("fr-FR");
   document.getElementById("kpi-translations").textContent = KPIS.translations.toLocaleString("fr-FR");
   document.getElementById("kpi-wikidata").textContent = KPIS.wikidata.toLocaleString("fr-FR");
 
+  // Bar chart
   Plotly.newPlot("bar-top-lang", [{
     x: TOP15.map(d => d.lang),
     y: TOP15.map(d => d.count),
@@ -158,6 +175,7 @@
     font: { color: '#e8eaed' }
   });
 
+  // Donut
   Plotly.newPlot("donut-top8", [{
     labels: TOP8.map(d => d.lang),
     values: TOP8.map(d => d.count),
@@ -171,6 +189,7 @@
     font: { color: '#e8eaed' }
   });
 
+  // Tableau
   const tbody = document.getElementById("lang-table-body");
   TABLE_DATA.forEach(row => {
     tbody.innerHTML += `<tr><td>${row.lang}</td><td>${row.label}</td></tr>`;
@@ -184,6 +203,29 @@
         url: "https://cdn.datatables.net/plug-ins/1.13.8/i18n/fr-FR.json"
       }
     });
+  });
+
+  // Filtres
+  document.getElementById("filter-all").onclick = () => {
+    toggleFilter("filter-all");
+  };
+  document.getElementById("filter-categories").onclick = () => {
+    toggleFilter("filter-categories");
+  };
+  document.getElementById("filter-languages").onclick = () => {
+    toggleFilter("filter-languages");
+  };
+
+  function toggleFilter(id) {
+    ["filter-all", "filter-categories", "filter-languages"].forEach(btn => {
+      document.getElementById(btn).classList.remove("on");
+    });
+    document.getElementById(id).classList.add("on");
+  }
+
+  document.getElementById("search-box").addEventListener("input", (e) => {
+    const q = e.target.value.toLowerCase();
+    // future: filtrer tableau + graphes
   });
 </script>
 
