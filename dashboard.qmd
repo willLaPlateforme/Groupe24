@@ -1,0 +1,397 @@
+---
+title: "OpenFoodFacts – Taxonomy Explorer"
+format:
+  html:
+    theme: none
+    toc: false
+    page-layout: full
+    css: style.css
+    include-in-header:
+      text: |
+        <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+        <link rel="stylesheet" href="https://cdn.datatables.net/1.13.8/css/dataTables.bootstrap5.min.css"/>
+        <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+        <script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
+        <script src="https://cdn.datatables.net/1.13.8/js/dataTables.bootstrap5.min.js"></script>
+jupyter: python3
+---
+
+```{python}
+#| echo: false
+#| output: false
+
+import pandas as pd
+import json
+from pathlib import Path
+from collections import defaultdict
+
+# ── Chargement des fichiers ──────────────────────────────────────────────────
+with open("categories.json", encoding="utf-8") as f:
+    categories = json.load(f)
+
+with open("translations.json", encoding="utf-8") as f:
+    translations = json.load(f)
+
+with open("wikidata_labels.json", encoding="utf-8") as f:
+    wikidata_labels = json.load(f)
+
+# ── KPIs ─────────────────────────────────────────────────────────────────────
+kpi_categories = len(categories)
+kpi_languages  = len({
+    lang
+    for c in categories.values()
+    if "name" in c
+    for lang in c["name"]
+})
+kpi_translations = sum(len(v) for v in translations.values())
+kpi_wikidata     = len(wikidata_labels)
+
+# ── Vue « Langues » – toutes les paires lang/label ───────────────────────────
+lang_rows = []
+for key, data in categories.items():
+    if "name" in data:
+        for lang, label in data["name"].items():
+            lang_rows.append({"lang": lang, "label": label})
+
+df_lang = pd.DataFrame(lang_rows)
+
+top_lang = (
+    df_lang.groupby("lang")
+    .size()
+    .sort_values(ascending=False)
+    .head(15)
+    .reset_index(name="count")
+)
+top8 = top_lang.head(8)
+
+# ── Vue « Catégories » – chaque catégorie + ses langues ──────────────────────
+cat_rows = []
+for key, data in list(categories.items())[:800]:     # 800 lignes max pour la perf
+    if "name" not in data:
+        continue
+    names = data["name"]
+    langs = sorted(names.keys())
+    cat_rows.append({
+        "key"    : key,
+        "fr"     : names.get("fr", ""),
+        "en"     : names.get("en", ""),
+        "n_langs": len(langs),
+        "langs"  : langs[:12],                       # max 12 langues affichées
+    })
+
+# Trier par nb langues décroissant
+cat_rows.sort(key=lambda r: -r["n_langs"])
+
+# ── Sérialisation JSON pour injection JS ─────────────────────────────────────
+js_kpis   = json.dumps({
+    "categories"  : kpi_categories,
+    "languages"   : kpi_languages,
+    "translations": kpi_translations,
+    "wikidata"    : kpi_wikidata
+})
+js_top15  = top_lang.to_json(orient="records", force_ascii=False)
+js_top8   = top8.to_json(orient="records", force_ascii=False)
+js_table  = df_lang.sample(min(400, len(df_lang)), random_state=42)\
+                   .to_json(orient="records", force_ascii=False)
+js_cats   = json.dumps(cat_rows, ensure_ascii=False)
+```
+
+```{python}
+#| echo: false
+#| output: asis
+
+# Injection des données dans le scope global JS
+print(f"""
+<script>
+const KPIS    = {js_kpis};
+const TOP15   = {js_top15};
+const TOP8    = {js_top8};
+const LANG_TABLE = {js_table};
+const CAT_DATA   = {js_cats};
+</script>
+""")
+```
+
+```{=html}
+<div class="shell view">
+
+  <!-- ── HEADER ─────────────────────────────────────────────────────── -->
+  <header>
+    <div class="eyebrow">OpenFoodFacts · Taxonomy Explorer</div>
+    <h1>Couverture <em>taxonomies</em> &amp; traductions</h1>
+    <div class="meta-row">
+      <div class="meta-chip">
+        <span class="dot"></span>
+        Dashboard · Python + Quarto
+      </div>
+      <div class="meta-chip">
+        Données : categories.json · translations.json · wikidata_labels.json · parquet OFF
+      </div>
+    </div>
+  </header>
+
+  <!-- ── FILTRE ─────────────────────────────────────────────────────── -->
+  <div class="toolbar">
+    <div class="tlabel">FILTRE</div>
+    <button class="fbtn on"  id="filter-all">Tout</button>
+    <button class="fbtn"     id="filter-categories">Catégories</button>
+    <button class="fbtn"     id="filter-languages">Langues les plus traduites</button>
+    <div class="tr sw">
+      <span class="si">🔍</span>
+      <input type="text" id="search-box" class="sbox" placeholder="filtrer…">
+    </div>
+  </div>
+
+  <!-- ── KPIs ───────────────────────────────────────────────────────── -->
+  <section>
+    <div class="stats-row">
+      <div class="sc">
+        <div class="n g" id="kpi-categories">–</div>
+        <div class="l">TAGS CATÉGORIES</div>
+      </div>
+      <div class="sc">
+        <div class="n b" id="kpi-languages">–</div>
+        <div class="l">LANGUES DÉTECTÉES</div>
+      </div>
+      <div class="sc">
+        <div class="n a" id="kpi-translations">–</div>
+        <div class="l">TRADUCTIONS TOTALES</div>
+      </div>
+      <div class="sc">
+        <div class="n t" id="kpi-wikidata">–</div>
+        <div class="l">ENTRÉES WIKIDATA</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── VUE « TOUT » + « LANGUES » ────────────────────────────────── -->
+  <div id="view-langs">
+
+    <!-- Graphiques -->
+    <section class="grid2">
+      <div class="panel">
+        <div class="ph">
+          <div class="pt">📊 Noms par langue – Top 15</div>
+        </div>
+        <div class="pbody">
+          <div id="bar-top-lang" class="cw tall"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph">
+          <div class="pt">🍩 Répartition Top 8</div>
+        </div>
+        <div class="pbody">
+          <div id="donut-top8" class="cw tall"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tableau langues -->
+    <section class="panel" style="margin-bottom:1rem">
+      <div class="ph">
+        <div class="pt">📋 Noms de catégories – toutes langues (échantillon)</div>
+      </div>
+      <div class="pbody">
+        <table id="lang-table" class="dtbl display">
+          <thead>
+            <tr>
+              <th>Langue</th>
+              <th>Label</th>
+            </tr>
+          </thead>
+          <tbody id="lang-table-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </div><!-- /view-langs -->
+
+  <!-- ── VUE « CATÉGORIES » ─────────────────────────────────────────── -->
+  <div id="view-cats" style="display:none">
+    <section class="panel" style="margin-bottom:1rem">
+      <div class="ph">
+        <div class="pt">🗂️ Catégories &amp; langues disponibles</div>
+        <div class="pb" id="cat-count-badge">–</div>
+      </div>
+      <div class="pbody">
+        <table id="cat-table" class="dtbl display">
+          <thead>
+            <tr>
+              <th>Tag</th>
+              <th>Nom FR</th>
+              <th>Nom EN</th>
+              <th style="text-align:center">Langues</th>
+              <th>Langues disponibles</th>
+            </tr>
+          </thead>
+          <tbody id="cat-table-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </div><!-- /view-cats -->
+
+</div><!-- /shell -->
+```
+
+```{=html}
+<script>
+/* ══════════════════════════════════════════════════════════════════════
+   DASHBOARD LOGIC
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* ── KPIs ───────────────────────────────────────────────────────────── */
+document.getElementById("kpi-categories").textContent  = KPIS.categories.toLocaleString("fr-FR");
+document.getElementById("kpi-languages").textContent   = KPIS.languages.toLocaleString("fr-FR");
+document.getElementById("kpi-translations").textContent= KPIS.translations.toLocaleString("fr-FR");
+document.getElementById("kpi-wikidata").textContent    = KPIS.wikidata.toLocaleString("fr-FR");
+
+/* ── Plotly – couleurs cohérentes avec style.css ────────────────────── */
+const COLORS = ["#60a5fa","#4ade80","#f59e0b","#2dd4bf","#a78bfa",
+                "#f87171","#fb923c","#e879f9","#34d399","#38bdf8",
+                "#facc15","#818cf8","#c084fc","#fb7185","#94a3b8"];
+
+const PLOTLY_LAYOUT = {
+  paper_bgcolor : "rgba(0,0,0,0)",
+  plot_bgcolor  : "rgba(0,0,0,0)",
+  font          : { color: "#e8eaed", family: "'IBM Plex Mono', monospace", size: 11 },
+  margin        : { t: 10, r: 10, b: 40, l: 40 },
+  showlegend    : false,
+};
+const PLOTLY_CFG = { responsive: true, displayModeBar: false };
+
+/* ── Bar chart ──────────────────────────────────────────────────────── */
+Plotly.newPlot("bar-top-lang", [{
+  x     : TOP15.map(d => d.lang),
+  y     : TOP15.map(d => d.count),
+  type  : "bar",
+  marker: { color: COLORS.slice(0, TOP15.length) },
+  hovertemplate: "<b>%{x}</b><br>%{y:,} labels<extra></extra>",
+}], {
+  ...PLOTLY_LAYOUT,
+  xaxis: { gridcolor: "#2a2d35", tickfont: { color: "#9ca3af" } },
+  yaxis: { gridcolor: "#2a2d35", tickfont: { color: "#9ca3af" } },
+}, PLOTLY_CFG);
+
+/* ── Donut ──────────────────────────────────────────────────────────── */
+Plotly.newPlot("donut-top8", [{
+  labels      : TOP8.map(d => d.lang),
+  values      : TOP8.map(d => d.count),
+  type        : "pie",
+  hole        : 0.55,
+  textinfo    : "label+percent",
+  textfont    : { color: "#e8eaed" },
+  marker      : { colors: COLORS.slice(0, TOP8.length) },
+  hovertemplate: "<b>%{label}</b><br>%{value:,} labels (%{percent})<extra></extra>",
+}], {
+  ...PLOTLY_LAYOUT,
+  showlegend: false,
+}, PLOTLY_CFG);
+
+/* ── Tableau langues ─────────────────────────────────────────────────── */
+(function buildLangTable() {
+  const tbody = document.getElementById("lang-table-body");
+  LANG_TABLE.forEach(row => {
+    tbody.innerHTML += `
+      <tr>
+        <td><span class="mono-tag">${row.lang}</span></td>
+        <td>${escHtml(row.label)}</td>
+      </tr>`;
+  });
+})();
+
+/* ── Tableau catégories ──────────────────────────────────────────────── */
+(function buildCatTable() {
+  document.getElementById("cat-count-badge").textContent =
+    CAT_DATA.length.toLocaleString("fr-FR") + " catégories";
+
+  const LANG_COLORS = [
+    "pg","pb2","pa","pg","pb2","pa","pg","pb2","pa","pg","pb2","pa",
+  ];
+  const tbody = document.getElementById("cat-table-body");
+
+  CAT_DATA.forEach(row => {
+    const pills = row.langs
+      .map((l, i) => `<span class="pill ${LANG_COLORS[i % LANG_COLORS.length]}">${l}</span>`)
+      .join("");
+
+    tbody.innerHTML += `
+      <tr>
+        <td><span class="mono-tag">${escHtml(row.key)}</span></td>
+        <td>${escHtml(row.fr)}</td>
+        <td>${escHtml(row.en)}</td>
+        <td style="text-align:center">
+          <span class="mono-tag">${row.n_langs}</span>
+        </td>
+        <td>${pills}</td>
+      </tr>`;
+  });
+})();
+
+/* ── DataTables (initialisés une seule fois) ─────────────────────────── */
+let dtLang, dtCat;
+
+$(document).ready(function () {
+  const i18n = { url: "https://cdn.datatables.net/plug-ins/1.13.8/i18n/fr-FR.json" };
+
+  dtLang = $("#lang-table").DataTable({
+    pageLength  : 10,
+    lengthChange: false,
+    language    : i18n,
+  });
+
+  dtCat = $("#cat-table").DataTable({
+    pageLength  : 10,
+    lengthChange: false,
+    language    : i18n,
+    columnDefs  : [{ orderable: false, targets: 4 }],   // pilules pas triables
+    order       : [[3, "desc"]],                          // tri par nb langues
+  });
+});
+
+/* ── Filtres ─────────────────────────────────────────────────────────── */
+const BTNS = ["filter-all", "filter-categories", "filter-languages"];
+
+function setFilter(id) {
+  BTNS.forEach(b => document.getElementById(b).classList.remove("on"));
+  document.getElementById(id).classList.add("on");
+
+  const showLangs = (id === "filter-all" || id === "filter-languages");
+  const showCats  = (id === "filter-all" || id === "filter-categories");
+
+  document.getElementById("view-langs").style.display = showLangs ? "" : "none";
+  document.getElementById("view-cats").style.display  = showCats  ? "" : "none";
+
+  // Re-draw pour que DataTables recalcule les dimensions
+  if (showLangs && dtLang) dtLang.columns.adjust().draw(false);
+  if (showCats  && dtCat)  dtCat.columns.adjust().draw(false);
+
+  // Re-draw Plotly si les conteneurs étaient cachés
+  if (showLangs) {
+    Plotly.Plots.resize("bar-top-lang");
+    Plotly.Plots.resize("donut-top8");
+  }
+}
+
+document.getElementById("filter-all").onclick        = () => setFilter("filter-all");
+document.getElementById("filter-categories").onclick = () => setFilter("filter-categories");
+document.getElementById("filter-languages").onclick  = () => setFilter("filter-languages");
+
+/* ── Recherche globale ───────────────────────────────────────────────── */
+document.getElementById("search-box").addEventListener("input", function () {
+  const q = this.value;
+  if (dtLang) dtLang.search(q).draw();
+  if (dtCat)  dtCat.search(q).draw();
+});
+
+/* ── Helpers ─────────────────────────────────────────────────────────── */
+function escHtml(s) {
+  if (!s) return "";
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+</script>
+```
