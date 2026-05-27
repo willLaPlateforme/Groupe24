@@ -118,7 +118,7 @@ const CAT_DATA   = {js_cats};
   <!-- ── HEADER ─────────────────────────────────────────────────────── -->
   <header>
     <div class="eyebrow">OpenFoodFacts · Taxonomy Explorer</div>
-    <h1>Traslation <em>Tracker</em></h1>
+    <h1>Translation <em>Tracker</em></h1>
     <div class="meta-row">
       <div class="meta-chip">
         <span class="dot"></span>
