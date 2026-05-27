@@ -1,5 +1,5 @@
 ---
-title: "OpenFoodFacts – Taxonomy Explorer"
+title: "OpenFoodFacts – Translation Tracker"
 format:
   html:
     theme: none
@@ -118,7 +118,7 @@ const CAT_DATA   = {js_cats};
   <!-- ── HEADER ─────────────────────────────────────────────────────── -->
   <header>
     <div class="eyebrow">OpenFoodFacts · Taxonomy Explorer</div>
-    <h1>Couverture <em>taxonomies</em> &amp; traductions</h1>
+    <h1>Traslation <em>Tracker</em></h1>
     <div class="meta-row">
       <div class="meta-chip">
         <span class="dot"></span>
@@ -135,7 +135,7 @@ const CAT_DATA   = {js_cats};
     <div class="tlabel">FILTRE</div>
     <button class="fbtn on"  id="filter-all">Tout</button>
     <button class="fbtn"     id="filter-categories">Catégories</button>
-    <button class="fbtn"     id="filter-languages">Langues les plus traduites</button>
+    <button class="fbtn"     id="filter-languages">Produits</button>
     <div class="tr sw">
       <span class="si">🔍</span>
       <input type="text" id="search-box" class="sbox" placeholder="filtrer…">
